@@ -1,10 +1,14 @@
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, CallbackContext
+from dotenv import load_dotenv
 import os
 import requests
 
 
-TOKEN = '8098723084:AAFcdHWivkKHgQ4npufEhHpyPv7fO4UeCBA'
+load_dotenv()
+
+TOKEN = os.getenv('TELEGRAM_TOKEN')
+print(f"Токен бота: {TOKEN}")
 
 async def start(update: Update, context: CallbackContext) -> None:
     await update.message.reply_text('Введите IMEI для проверки.')
