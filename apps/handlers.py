@@ -2,32 +2,22 @@ from aiogram import F, Router
 from aiogram.filters import CommandStart, Command
 from aiogram.types import Message, CallbackQuery
 import apps.keyboards as kb
-from aiogram.fsm.state import State, StatesGroup
+from apps.state import *
 from aiogram.fsm.context import FSMContext
 from app import check_admin, validate_imei, delete_user, check_user_exists, save_user,check_user_permission, open_permission_user
+
+
 router = Router()
-
-
-class AddUser(StatesGroup):
-    waiting_for_id = State()
-
-
-class DelUser(StatesGroup):
-    waiting_for_id = State()
-
-
-class CheckIMEI(StatesGroup):
-    waiting_for_imei = State()
 
 
 @router.message(CommandStart())
 async def start(message: Message):    
     if not check_user_exists(message.from_user.id):
         save_user(message.from_user.id)
+    
     if not check_user_permission(message.from_user.id):
         await message.answer(f'Привет, {message.from_user.first_name}.\nУ вас нет доступа к боту. Обратитесь к администратору.')
-
-
+    
     elif check_admin(message.from_user.id):
         await message.answer(f'Привет, {message.from_user.first_name}.\nТы администратор бота\nВыбери действие.', reply_markup=kb.admin)
     else: 
@@ -41,6 +31,7 @@ async def back(message: Message, state: FSMContext):
     else: 
         await message.answer(f'Выбери действие.', reply_markup=kb.main)
     await state.clear()
+
 
 @router.message(F.text=='Добавить пользователя')
 async def add_user(message: Message, state: FSMContext):    
@@ -100,6 +91,15 @@ async def enter_imei(message: Message, state: FSMContext):
             await message.reply(f'Вы ввели не корректный IMEI. Попробуйте ещё раз.', reply_markup=kb.admin)
         else: 
             await message.reply(f'Вы ввели не корректный IMEI. Попробуйте ещё раз.', reply_markup=kb.main)
+
+
+@router.message()
+async def none_message(message: Message):
+    if check_admin(message.from_user.id):
+        await message.reply(f'Не понимаю, что ты хочешь...', reply_markup=kb.admin)
+    else: 
+        await message.reply(f'Не понимаю, что ты хочешь...', reply_markup=kb.main)
+
 
 
 # @router.callback_query(F.data == 'check_imei')

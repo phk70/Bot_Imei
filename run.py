@@ -9,20 +9,18 @@ from apps.handlers import router
 load_dotenv()
 
 
-bot = Bot(token=os.getenv('TELEGRAM_TOKEN'))
-dp = Dispatcher() 
-
-
-
-
 async def main():
+    bot = Bot(token=os.getenv('TELEGRAM_TOKEN'))
+    dp = Dispatcher() 
     dp.include_router(router)
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    asyncio.run(main())
-
+    try:
+        asyncio.run(main())
+    except (KeyboardInterrupt):
+        'Бот закрыт'
 
 
 
