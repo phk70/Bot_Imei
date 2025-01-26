@@ -1,60 +1,82 @@
 import asyncio
 import logging
 import os
-from aiogram import Bot, Dispatcher, types
-from aiogram.filters.command import Command
-from aiogram.types import KeyboardButton, ReplyKeyboardMarkup
+
+from aiogram import Bot, Dispatcher
 from dotenv import load_dotenv
-from app import check_user_exists, check_admin, permission_user_exists, delete_user
-from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import State, StatesGroup
+from apps.handlers import router
+
 load_dotenv()
 
 
-logging.basicConfig(level=logging.INFO)
 bot = Bot(token=os.getenv('TELEGRAM_TOKEN'))
 dp = Dispatcher() 
 
-def main_keyboard(user_telegram_id: int):     
-    if check_admin(user_telegram_id):
-        kb_list = [[KeyboardButton(text='Добавить пользователя'), KeyboardButton(text='Удалить пользователя')]]
-        keyboard = ReplyKeyboardMarkup(keyboard=kb_list, resize_keyboard=True, one_time_keyboard=False)    
-        return keyboard
 
 
-@dp.message(Command('start'))
-async def start(message: types.Message):
-    '''Запуск бота'''
-    if check_admin(message.from_user.id):
-        await message.answer(f'Привет, {message.from_user.first_name}.\nВведи IMEI для проверки.', reply_markup=main_keyboard(message.from_user.id))
 
-    elif check_user_exists(message.from_user.id):
-        await message.answer(f'Привет, {message.from_user.first_name}.\nВведи IMEI для проверки.')
-    else:
-        await message.answer(f'Привет, {message.from_user.first_name}.\nУ тебя нет доступа к боту. Пожалуйста, зарегистрируйся.')
+async def main():
+    dp.include_router(router)
+    await dp.start_polling(bot)
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    asyncio.run(main())
 
 
-last_messages = []  # Для того чтобы держать в памяти последнее сообщение чата
 
-@dp.message(Command('Удалить пользователя'))
-async def store_message(message: types.Message):    
-    last_messages.append(message.text) # Добавляем последнее сообщение в список типа "кеш":)    
+
+
+
+
+
+
+
+
+
+
+
+
+# def main_keyboard(user_telegram_id: int):     
+#     if check_admin(user_telegram_id):
+#         kb_list = [[KeyboardButton(text='Добавить пользователя'), KeyboardButton(text='Удалить пользователя')]]
+#         keyboard = ReplyKeyboardMarkup(keyboard=kb_list, resize_keyboard=True, one_time_keyboard=False)    
+#         return keyboard
+
+
+# @dp.message(Command('start'))
+# async def start(message: types.Message):
+#     '''Запуск бота'''
+#     if check_admin(message.from_user.id):
+#         await message.answer(f'Привет, {message.from_user.first_name}.\nВведи IMEI для проверки.', reply_markup=main_keyboard(message.from_user.id))
+
+#     elif check_user_exists(message.from_user.id):
+#         await message.answer(f'Привет, {message.from_user.first_name}.\nВведи IMEI для проверки.')
+#     else:
+#         await message.answer(f'Привет, {message.from_user.first_name}.\nУ тебя нет доступа к боту. Пожалуйста, зарегистрируйся.')
+
+
+# last_messages = []  # Для того чтобы держать в памяти последнее сообщение чата
+
+# @dp.message(Command('Удалить пользователя'))
+# async def store_message(message: types.Message):    
+#     last_messages.append(message.text) # Добавляем последнее сообщение в список типа "кеш":)    
     
 
-@dp.message()
-async def del_user(message: types.Message):    
-    print(last_messages[-1])    
-    if last_messages[-1]=='Удалить пользователя':
-        await message.answer('Введите telegram_id пользователя для удаления.')
-        telegram_id_for_delete = message.text  #Получаем элемент из списка        
-        delete_user(telegram_id_for_delete)
-        await message.answer(f'Пользователь c telegram_id - {telegram_id_for_delete} удален из базы данных.')
+# @dp.message()
+# async def del_user(message: types.Message):    
+#     print(last_messages[-1])    
+#     if last_messages[-1]=='Удалить пользователя':
+#         await message.answer('Введите telegram_id пользователя для удаления.')
+#         telegram_id_for_delete = message.text  #Получаем элемент из списка        
+#         delete_user(telegram_id_for_delete)
+#         await message.answer(f'Пользователь c telegram_id - {telegram_id_for_delete} удален из базы данных.')
 
-    if last_messages[-1]=='Добавить пользователя': 
-        await message.answer('Введите telegram_id пользователя')
-        telegram_id_for_add = int(message.text)  # Получаем элемент из списка        
-        permission_user_exists(telegram_id_for_add)
-        await messsage.answer(f'Пользовател. c telegram_id - {telegram_id_for_delete} добавлен доступ к боту.')
+#     if last_messages[-1]=='Добавить пользователя': 
+#         await message.answer('Введите telegram_id пользователя')
+#         telegram_id_for_add = int(message.text)  # Получаем элемент из списка        
+#         permission_user_exists(telegram_id_for_add)
+#         await messsage.answer(f'Пользовател. c telegram_id - {telegram_id_for_delete} добавлен доступ к боту.')
         
 
 # @dp.message()
@@ -109,16 +131,11 @@ async def del_user(message: types.Message):
 #         await message.reply("Вы ввели не корректный IMEI. Попробуйте ещё раз.")
 
 
-def imei_is_valid(imei):
-    '''Валидация введенного IMEI по длине и составу'''
-    return (len(imei) in [15]) and imei.isdigit()
+# def imei_is_valid(imei):
+#     '''Валидация введенного IMEI по длине и составу'''
+#     return (len(imei) in [15]) and imei.isdigit()
 
 
-async def main():
-    await dp.start_polling(bot)
-
-if __name__ == "__main__":
-    asyncio.run(main())
 
 
 
