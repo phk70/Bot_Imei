@@ -1,51 +1,162 @@
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, CallbackContext
-from dotenv import load_dotenv
+import asyncio
+import logging
 import os
-import requests
-
-
+from aiogram import Bot, Dispatcher, types
+from aiogram.filters.command import Command
+from aiogram.types import KeyboardButton, ReplyKeyboardMarkup
+from dotenv import load_dotenv
+from app import check_user_exists, check_admin, permission_user_exists, delete_user
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
 load_dotenv()
 
-TOKEN = os.getenv('TELEGRAM_TOKEN')
-print(f"Токен бота: {TOKEN}")
 
-async def start(update: Update, context: CallbackContext) -> None:
-    await update.message.reply_text('Введите IMEI для проверки.')
+logging.basicConfig(level=logging.INFO)
+bot = Bot(token=os.getenv('TELEGRAM_TOKEN'))
+dp = Dispatcher() 
 
-async def register(update: Update, context: CallbackContext) -> None:
-    telegram_id = update.message.from_user.id
-    response = requests.post('http://localhost:5000/api/register', json={"telegram_id": telegram_id})
+def main_keyboard(user_telegram_id: int):     
+    if check_admin(user_telegram_id):
+        kb_list = [[KeyboardButton(text='Добавить пользователя'), KeyboardButton(text='Удалить пользователя')]]
+        keyboard = ReplyKeyboardMarkup(keyboard=kb_list, resize_keyboard=True, one_time_keyboard=False)    
+        return keyboard
 
-    if response.status_code == 201:
-        token = response.json()['token']
-        await update.message.reply_text(f'Вы успешно зарегистрированы! Ваш токен: {token}')
+
+@dp.message(Command('start'))
+async def start(message: types.Message):
+    '''Запуск бота'''
+    if check_admin(message.from_user.id):
+        await message.answer(f'Привет, {message.from_user.first_name}.\nВведи IMEI для проверки.', reply_markup=main_keyboard(message.from_user.id))
+
+    elif check_user_exists(message.from_user.id):
+        await message.answer(f'Привет, {message.from_user.first_name}.\nВведи IMEI для проверки.')
     else:
-        await update.message.reply_text('Ошибка регистрации.')
+        await message.answer(f'Привет, {message.from_user.first_name}.\nУ тебя нет доступа к боту. Пожалуйста, зарегистрируйся.')
 
-async def check_imei(update: Update, context: CallbackContext) -> None:
-    imei = update.message.text
-    print(f"Полученный IMEI: {imei}")  
 
-    user_token = 'USER_AUTH_TOKEN'  # Тут нужно будет реализовать метод получения токена пользователя
-    response = requests.post('http://localhost:5000/api/check-imei', json={"imei": imei, "token": user_token})
+last_messages = []  # Для того чтобы держать в памяти последнее сообщение чата
 
-    print(f"Статус код ответа: {response.status_code}")
-    if response.status_code == 200:
-        services = response.json()
-        # Отправьте сообщение пользователю с сервисами
-    else:
-        # Обработка ошибок
-        await update.message.reply_text(response.json().get("error", "Произошла ошибка."))
+@dp.message(Command('Удалить пользователя'))
+async def store_message(message: types.Message):    
+    last_messages.append(message.text) # Добавляем последнее сообщение в список типа "кеш":)    
+    
 
-def main() -> None:
-    app = ApplicationBuilder().token(TOKEN).build()
+@dp.message()
+async def del_user(message: types.Message):    
+    print(last_messages[-1])    
+    if last_messages[-1]=='Удалить пользователя':
+        await message.answer('Введите telegram_id пользователя для удаления.')
+        telegram_id_for_delete = message.text  #Получаем элемент из списка        
+        delete_user(telegram_id_for_delete)
+        await message.answer(f'Пользователь c telegram_id - {telegram_id_for_delete} удален из базы данных.')
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("register", register))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, check_imei))
+    if last_messages[-1]=='Добавить пользователя': 
+        await message.answer('Введите telegram_id пользователя')
+        telegram_id_for_add = int(message.text)  # Получаем элемент из списка        
+        permission_user_exists(telegram_id_for_add)
+        await messsage.answer(f'Пользовател. c telegram_id - {telegram_id_for_delete} добавлен доступ к боту.')
+        
 
-    app.run_polling()
+# @dp.message()
+# async def add_user(message: types.Message):
+#     await message.answer('Введите telegram_id пользователя')
+#     if last_messages:
+#         last_msg = int(last_messages[0])  # Получаем элемент из списка
+#         permission_user_exists(last_msg)
+#         await message.answer(f'Пользователю c telegram_id - {last_msg} добавлен доступ к боту')
+#     else:
+#         await message.answer('Вы не ввели telegram_id пользователя.')
 
-if __name__ == '__main__':
-    main()
+
+# @dp.message()
+# async def del_user(message: types.Message):    
+#     print(last_messages[-1])
+#     if last_messages[-1]=='Удалить пользователя':
+#         await message.answer('Введите telegram_id пользователя для удаления')
+#         telegram_id_for_delete = int(message.text)  # Получаем элемент из списка        
+#         delete_user(telegram_id_for_delete)
+#         await message.answer(f'Пользователь c telegram_id - {telegram_id_for_delete} удален из базы данных') 
+
+
+
+# @dp.message(Command('register'))
+# async def register(message: types.Message):
+#     '''Регистрация пользователя'''   
+#     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+#     btn = types.KeyboardButton("Регистрация")
+#     markup.add(btn)
+#     await message.answer(reply_markup=markup)
+
+
+# @dp.message()
+# async def check_imei(message: types.Message):
+#     '''Проверка IMEI'''
+#     imei = message.text
+#     if imei_is_valid(imei):  # Если IMEI валиден отправляем его по адресу API, передавая его и токен в теле запроса. Или просим ввести ещё раз
+#         await message.reply(f"Ваш IMEI: {imei}\nПодождите завершения проверки.")
+#         response = requests.post('http://localhost:5000/api/check-imei', json={'imei': imei, 'token': 'YOUR_TOKEN'})
+
+#         if response.status_code == 200:  # Если запрос прошел успешно показываем пользователю список доступных услуг. Или выводим сообщение об ошибке
+#             services = response.json()            
+#             markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+#             for service in services:
+#                 btn = types.KeyboardButton(service['service_name'])
+#                 markup.add(btn)
+#             await message.answer("Выберите сервис:", reply_markup=markup)
+#         else:
+#             await message.answer("Ошибка при получении услуг.")
+#     else:
+#         await message.reply("Вы ввели не корректный IMEI. Попробуйте ещё раз.")
+
+
+def imei_is_valid(imei):
+    '''Валидация введенного IMEI по длине и составу'''
+    return (len(imei) in [15]) and imei.isdigit()
+
+
+async def main():
+    await dp.start_polling(bot)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
+
+
+
+
+
+# bot = Bot(token=API_TOKEN)
+# storage = MemoryStorage()
+# dp = Dispatcher(bot, storage=storage)
+
+# @dp.message_handler(commands=['start'])
+# async def start(message: types.Message):
+#     await message.answer("Привет! Отправь IMEI для проверки.")
+
+# @dp.message_handler(func=lambda message: True)
+# async def handle_imei(message: types.Message):
+#     imei = message.text.strip()  # Получаем IMEI из сообщения
+#     if not is_valid_imei(imei):
+#         await message.answer("Некорректный IMEI. Попробуйте снова.")
+#         return
+    
+#     # Выполняем запрос к API для получения услуг
+#     response = requests.post('http://localhost:5000/api/check-imei', json={'imei': imei, 'token': 'YOUR_TOKEN'})
+    
+#     if response.status_code == 200:
+#         services = response.json()
+#         # Здесь мы формируем клавиатуру с кнопками для каждого сервиса
+#         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+#         for service in services:
+#             btn = types.KeyboardButton(service['service_name'])
+#             markup.add(btn)
+#         await message.answer("Выберите сервис:", reply_markup=markup)
+#     else:
+#         await message.answer("Ошибка при получении услуг.")
+
+# def is_valid_imei(imei):
+#     # Здесь можно реализовать простую проверку IMEI
+#     return len(imei) in [15]
+
+# if __name__ == '__main__':
+#     executor.start_polling(dp, skip_updates=True)
