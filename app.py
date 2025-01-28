@@ -4,7 +4,6 @@ import os
 import secrets
 
 
-# 5285926615
 app = Flask(__name__)
 
 
@@ -121,9 +120,9 @@ def check_admin(telegram_id):
         return True
     
 
-
 def main():
     app.run(debug=True)
+
 
 if __name__ == '__main__':
     main()

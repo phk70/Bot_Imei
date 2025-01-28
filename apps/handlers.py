@@ -6,9 +6,8 @@ from aiogram.fsm.context import FSMContext
 
 import apps.keyboards as kb
 from apps.states import *
-from app import create_db, check_admin, validate_imei, delete_user, check_user_exists, save_user, check_user_permission, open_permission_user
-from apps.services import get_services
-# import apps.services as services  # берем даннные из клавиатуры по простому
+from app import create_db, check_admin, delete_user, check_user_exists, save_user, check_user_permission, open_permission_user
+from apps.api import check_imei
 
 
 router = Router()
@@ -97,7 +96,7 @@ async def enter_imei(message: Message, state: FSMContext):
     data = await state.get_data()
     imei = data['imei']
     await state.clear()
-    if validate_imei(imei):
+    if check_imei(imei):
         await message.answer(f'Доступные сервисы', reply_markup=kb.services_kb.adjust(1).as_markup())  # Отображение всех сервисов    
     else:       
         if check_admin(message.from_user.id):
@@ -105,8 +104,6 @@ async def enter_imei(message: Message, state: FSMContext):
         else: 
             await message.reply(f'Вы ввели не корректный IMEI. Попробуйте ещё раз.', reply_markup=kb.main)
     
-
-
 
 @router.callback_query()
 async def service_payment(callback_query: CallbackQuery):
@@ -126,13 +123,3 @@ async def none_message(message: Message):
         await message.reply(f'Не понимаю, что ты хочешь...', reply_markup=kb.main)
 
 
-
-# @router.callback_query(F.data == 'check_imei')
-# async def check_imei(callback: CallbackQuery):
-#     await callback.answer('')
-#     await callback.message.answer('Введите IMEI для проверки')
-
-
-# @router.message(Command('services'))
-# async def services(message: Message):
-    # await message.answer(f'Выбери действие.', reply_markup=await kb.get_services())
