@@ -1,8 +1,8 @@
-import token
-from flask import Flask, request, jsonify
+from flask import Flask, Response, request, jsonify
 import sqlite3
 import os
 import secrets
+
 
 # 5285926615
 app = Flask(__name__)
@@ -25,6 +25,7 @@ def create_db():
         conn.commit()
         conn.close()
 
+
 def save_user(telegram_id):
     '''Сохранение пользователя в базе данных.'''
     if not os.path.exists('users.db'):
@@ -36,6 +37,7 @@ def save_user(telegram_id):
     cursor.execute('INSERT INTO Users (telegram_id, token, admin, permission) VALUES (?, ?, ?, ?)', (telegram_id, token, False, False))
     conn.commit()
     conn.close()
+
 
 def delete_user(telegram_id):
     '''Удаление пользователя из базы данных.'''
@@ -58,6 +60,7 @@ def register():
         return jsonify({'message': f'Пользователь с telegram_id - {telegram_id} уже зарегистрирован.'}), 400    
     return jsonify({'message': 'Пользователь успешно зарегистрирован.'}), 200
 
+
 def check_user_permission(telegram_id):
     '''Проверка, имеет ли пользователь доступ к боту.'''
     conn = sqlite3.connect('users.db')
@@ -70,6 +73,7 @@ def check_user_permission(telegram_id):
     else:
         return True
 
+
 def check_user_exists(telegram_id):
     '''Проверка, существует ли пользователь.'''
     conn = sqlite3.connect('users.db')
@@ -79,11 +83,13 @@ def check_user_exists(telegram_id):
     conn.close()
     return user
 
+
 def validate_imei(imei):
     '''Проверка IMEI.'''
     if len(imei) != 15 and imei is not imei.isdigit():
         return False
     return True
+
 
 def open_permission_user(telegram_id):
     '''Открывает права на пользование ботом.'''
@@ -93,11 +99,14 @@ def open_permission_user(telegram_id):
     user = cursor.fetchone()  # Проверяем, существует ли пользователь
     if user is None:
         print('Пользователь не найден.')
+        return False
     else:        
         cursor.execute('UPDATE Users SET permission = ? WHERE telegram_id = ?', (1, telegram_id))  # Обновляем permission если пользователь найден
         conn.commit()
         print('Права пользователя обновлены.')
     conn.close()
+    return True
+
 
 def check_admin(telegram_id):
     '''Проверка, является ли пользователь администратором.'''
@@ -111,7 +120,6 @@ def check_admin(telegram_id):
     else:
         return True
     
-
 
 
 def main():
