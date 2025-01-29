@@ -1,21 +1,29 @@
-from gc import callbacks
-from aiogram import F, Router, filters
+import os
+from dotenv import load_dotenv
+from aiogram import F, Router
 from aiogram.filters import CommandStart
 from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 
 import apps.keyboards as kb
 from apps.states import *
-from app import create_db, check_admin, delete_user, check_user_exists, save_user, check_user_permission, open_permission_user
-from apps.api import check_imei
+from app import (validate_imei, 
+                 check_admin, 
+                 delete_user, 
+                 check_user_exists, 
+                 save_user, 
+                 check_user_permission, 
+                 open_permission_user, 
+                 get_all_permissions_for_admin)
+
+load_dotenv()
 
 
 router = Router()
 
 @router.message(CommandStart())
 async def start(message: Message):   
-    '''Обработка команды /start'''
-    create_db()
+    '''Обработка команды /start'''   
     if not check_user_exists(message.from_user.id):
         save_user(message.from_user.id)
     
@@ -28,6 +36,12 @@ async def start(message: Message):
     else: 
         await message.answer(f'Привет, {message.from_user.first_name}.\nВыбери действие.', reply_markup=kb.main)
     
+
+@router.message(F.text == os.getenv('ADMIN_PASSWORD'))
+async def admin(message: Message):
+    get_all_permissions_for_admin(message.from_user.id)
+    await message.answer(f'Поздравляю, {message.from_user.first_name}.\nТы администратор бота\nВыбери действие.', reply_markup=kb.admin)
+
 
 @router.message(F.text=='Назад')
 async def back(message: Message, state: FSMContext):
@@ -94,30 +108,31 @@ async def enter_imei(message: Message, state: FSMContext):
     '''Проверка IMEI на корректность'''
     await state.update_data(imei=message.text)       
     data = await state.get_data()
-    imei = data['imei']
+    imei = data['imei']    
     await state.clear()
-    if check_imei(imei):
-        await message.answer(f'Доступные сервисы', reply_markup=kb.services_kb.adjust(1).as_markup())  # Отображение всех сервисов    
+    
+    if validate_imei(imei):
+        await message.answer(f'Доступные сервисы', reply_markup=await kb.services_kb())  # Отображение всех сервисов    
     else:       
         if check_admin(message.from_user.id):
             await message.reply(f'Вы ввели не корректный IMEI. Попробуйте ещё раз.', reply_markup=kb.admin)
         else: 
             await message.reply(f'Вы ввели не корректный IMEI. Попробуйте ещё раз.', reply_markup=kb.main)
-    
 
-@router.callback_query()
+
+@router.callback_query(F.data.startswith('service'))
 async def service_payment(callback_query: CallbackQuery):
-    service_name = callback_query.data  # Получаем данные callback
-    print(service_name)
-    await bot.send_message(callback_query.from_user.id, f"Услуга {service_name} оплачена!")
-    
-    # Отвечаем на callback_query, чтобы убрать "часики"
-    await callback_query.answer()
+    service_name = callback_query.data # Получаем данные callback
+    print(service_name)    
+    await callback_query.answer(f"Услуга {service_name} оплачена!")  # Отвечаем на callback_query, чтобы убрать мерцание кнопки
 
 
 @router.message()
 async def none_message(message: Message):
-    if check_admin(message.from_user.id):
+    if not check_user_permission(message.from_user.id):
+        await message.answer(f'Привет, {message.from_user.first_name}.\nУ вас нет доступа к боту. Обратитесь к администратору.')
+
+    elif check_admin(message.from_user.id):
         await message.reply(f'Не понимаю, что ты хочешь...', reply_markup=kb.admin)
     else: 
         await message.reply(f'Не понимаю, что ты хочешь...', reply_markup=kb.main)
